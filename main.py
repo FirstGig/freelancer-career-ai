@@ -1,3 +1,6 @@
+import sys
+print("✅ Запуск бота...")
+print("🔧 Python версия:", sys.version)
 import os
 import requests
 from flask import Flask, request, jsonify
