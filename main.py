@@ -1,30 +1,51 @@
-# main.py — минималистичный и рабочий для Render
 import os
-from flask import Flask
-from telegram import Bot
-from telegram.ext import Application
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+import requests
 
-# Переменные окружения
+# === CONFIG ===
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
+OPENROUTER_API_KEY = os.environ["OPENROUTER_API_KEY"]
 WEBHOOK_URL = os.environ["WEBHOOK_URL"]
 
-app = Flask(__name__)
+# === HANDLERS ===
+async def start(update, context):
+    await update.message.reply_text(
+        "👋 Привет! Я — AI Career Navigator для фрилансеров.\n"
+        "Опиши свою ситуацию — и получи стратегию!"
+    )
 
-@app.route('/')
-def home():
-return "✅ AI Career Navigator is live!"
+async def handle(update, context):
+    user_msg = update.message.text
+    try:
+        r = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
+            json={
+                "model": "openai/gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": "Ты — эксперт по фрилансу. Отвечай кратко, по делу, на русском."},
+                    {"role": "user", "content": user_msg}
+                ]
+            },
+            timeout=15
+        )
+        if r.status_code == 200:
+            reply = r.json()["choices"][0]["message"]["content"]
+            await update.message.reply_text(reply[:4000])
+        else:
+            await update.message.reply_text("ИИ не отвечает. Попробуй позже.")
+    except Exception as e:
+        await update.message.reply_text("Ошибка обработки.")
 
-if __name__ == '__main__':
-# Создаем бота
-bot = Bot(token=TELEGRAM_TOKEN)
-application = Application.builder().token(TELEGRAM_TOKEN).build()
-
-# Устанавливаем webhook
-import asyncio
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
-loop.run_until_complete(bot.set_webhook(url=WEBHOOK_URL))
-
-print("🚀 Webhook установлен:", WEBHOOK_URL)
-port = int(os.environ.get("PORT", 10000))
-app.run(host="0.0.0.0", port=port)
+# === MAIN ===
+if __name__ == "__main__":
+    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
+    
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 10000)),
+        url_path=TELEGRAM_TOKEN,
+        webhook_url=WEBHOOK_URL
+    )
