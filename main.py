@@ -84,8 +84,9 @@ def home():
 # Запуск
 if __name__ == '__main__':
     import asyncio
-    # Устанавливаем webhook
-    asyncio.run(bot.set_webhook(url=WEBHOOK_URL))
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+loop.run_until_complete(bot.set_webhook(url=WEBHOOK_URL))
     print(f"Webhook установлен: {WEBHOOK_URL}")
     # Запускаем Flask
     port = int(os.environ.get("PORT", 10000))
